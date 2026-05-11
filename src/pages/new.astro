@@ -1,0 +1,165 @@
+---
+import Layout from '../layouts/Layout.astro';
+const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
+---
+
+<Layout title="記事を書く">
+  <style>
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    input, textarea {
+      font-family: inherit;
+      font-size: 1rem;
+      padding: 0.65rem 0.875rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--text);
+      transition: border-color 0.15s;
+      outline: none;
+      width: 100%;
+    }
+
+    input:focus, textarea:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+    }
+
+    textarea {
+      min-height: 320px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    button {
+      align-self: flex-start;
+      background: var(--green);
+      color: white;
+      border: none;
+      padding: 0.7rem 1.75rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button:hover { background: #15803d; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    #status {
+      padding: 0.875rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    #status.success {
+      display: block;
+      background: var(--green-light);
+      color: #166534;
+      border: 1px solid #bbf7d0;
+    }
+
+    #status.error {
+      display: block;
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 400;
+    }
+  </style>
+
+  <h1>記事を書く</h1>
+  <p class="subtitle">投稿するとGitHubにコミットされ、しばらくしてサイトに反映されます。</p>
+
+  <form id="post-form">
+    <label>
+      タイトル
+      <input type="text" name="title" placeholder="記事のタイトル" required maxlength="100" />
+    </label>
+    <label>
+      本文 <span class="hint">Markdown が使えます</span>
+      <textarea name="content" placeholder="記事の内容を書いてください..." required></textarea>
+    </label>
+    <div id="status"></div>
+    <button type="submit" id="submit-btn">投稿する</button>
+  </form>
+</Layout>
+
+<script define:vars={{ workerUrl }}>
+  const form = document.getElementById('post-form');
+  const btn = document.getElementById('submit-btn');
+  const status = document.getElementById('status');
+
+  function showStatus(message, type) {
+    status.textContent = message;
+    status.className = type;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = new FormData(form);
+    const title = data.get('title').trim();
+    const content = data.get('content').trim();
+
+    if (!title || !content) return;
+
+    btn.disabled = true;
+    btn.textContent = '送信中...';
+    showStatus('', '');
+
+    try {
+      const res = await fetch(`${workerUrl}/api/posts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `サーバーエラー (${res.status})`);
+      }
+
+      showStatus(
+        '投稿を受け付けました！GitHubへのコミット後、数分でサイトに反映されます 🌿',
+        'success'
+      );
+      form.reset();
+    } catch (err) {
+      showStatus(`エラー: ${err.message}`, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '投稿する';
+    }
+  });
+</script>
