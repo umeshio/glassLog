@@ -136,6 +136,10 @@ const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
       本文 <span class="hint">Markdown が使えます</span>
       <textarea name="content" placeholder="記事の内容を書いてください..." required></textarea>
     </label>
+    <label>
+      日付 <span class="hint">未入力の場合は今日の日付 (yyyy-mm-dd)</span>
+      <input type="date" name="date" />
+    </label>
     <div id="status"></div>
     <button type="submit" id="submit-btn">投稿する</button>
   </form>
@@ -167,6 +171,7 @@ const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
     const data = new FormData(form);
     const title = data.get('title').trim();
     const content = data.get('content').trim();
+    const date = data.get('date') || new Date().toISOString().split('T')[0];
 
     if (!title || !content) return;
 
@@ -181,7 +186,7 @@ const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('jwt')}`,
         },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({ title, content, date }),
       });
 
       if (res.status === 401) {
