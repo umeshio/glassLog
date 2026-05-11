@@ -5,10 +5,32 @@ const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
 
 <Layout title="記事を書く">
   <style>
+    .page-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+
     h1 {
       font-size: 1.75rem;
       font-weight: 700;
-      margin-bottom: 0.4rem;
+    }
+
+    .logout-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.35rem 0.875rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .logout-btn:hover {
+      border-color: #fca5a5;
+      color: #dc2626;
     }
 
     .subtitle {
@@ -55,7 +77,7 @@ const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
       line-height: 1.6;
     }
 
-    button {
+    button[type="submit"] {
       align-self: flex-start;
       background: var(--green);
       color: white;
@@ -68,8 +90,8 @@ const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
       transition: background 0.15s, opacity 0.15s;
     }
 
-    button:hover { background: #15803d; }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    button[type="submit"]:hover { background: #15803d; }
+    button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; }
 
     #status {
       padding: 0.875rem 1rem;
@@ -99,7 +121,10 @@ const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
     }
   </style>
 
-  <h1>記事を書く</h1>
+  <div class="page-header">
+    <h1>記事を書く</h1>
+    <button class="logout-btn" id="logout-btn">ログアウト</button>
+  </div>
   <p class="subtitle">投稿するとGitHubにコミットされ、しばらくしてサイトに反映されます。</p>
 
   <form id="post-form">
@@ -117,14 +142,25 @@ const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
 </Layout>
 
 <script define:vars={{ workerUrl }}>
+  const jwt = localStorage.getItem('jwt');
+  if (!jwt) {
+    window.location.replace('/login');
+  }
+
   const form = document.getElementById('post-form');
   const btn = document.getElementById('submit-btn');
   const status = document.getElementById('status');
+  const logoutBtn = document.getElementById('logout-btn');
 
   function showStatus(message, type) {
     status.textContent = message;
     status.className = type;
   }
+
+  logoutBtn.addEventListener('click', () => {
+    localStorage.removeItem('jwt');
+    window.location.replace('/login');
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -141,9 +177,18 @@ const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
     try {
       const res = await fetch(`${workerUrl}/api/posts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('jwt')}`,
+        },
         body: JSON.stringify({ title, content }),
       });
+
+      if (res.status === 401) {
+        localStorage.removeItem('jwt');
+        window.location.replace('/login');
+        return;
+      }
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

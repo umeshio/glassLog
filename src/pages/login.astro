@@ -1,0 +1,152 @@
+---
+import Layout from '../layouts/Layout.astro';
+const workerUrl = import.meta.env.PUBLIC_WORKER_URL ?? 'http://localhost:8787';
+---
+
+<Layout title="ログイン">
+  <style>
+    .login-wrap {
+      max-width: 400px;
+      margin: 2rem auto 0;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    input {
+      font-family: inherit;
+      font-size: 1rem;
+      padding: 0.65rem 0.875rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--text);
+      transition: border-color 0.15s;
+      outline: none;
+      width: 100%;
+    }
+
+    input:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+    }
+
+    button {
+      background: var(--green);
+      color: white;
+      border: none;
+      padding: 0.7rem 1.75rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button:hover { background: #15803d; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    #status {
+      padding: 0.875rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    #status.error {
+      display: block;
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+  </style>
+
+  <div class="login-wrap">
+    <h1>ログイン</h1>
+    <p class="subtitle">記事を投稿するにはパスワードが必要です。</p>
+
+    <form id="login-form">
+      <label>
+        パスワード
+        <input type="password" name="password" placeholder="パスワードを入力" required autofocus />
+      </label>
+      <div id="status"></div>
+      <button type="submit" id="submit-btn">ログイン</button>
+    </form>
+  </div>
+</Layout>
+
+<script define:vars={{ workerUrl }}>
+  // すでにログイン済みなら記事投稿ページへ
+  if (localStorage.getItem('jwt')) {
+    window.location.replace('/new');
+  }
+
+  const form = document.getElementById('login-form');
+  const btn = document.getElementById('submit-btn');
+  const status = document.getElementById('status');
+
+  function showError(message) {
+    status.textContent = message;
+    status.className = 'error';
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const password = new FormData(form).get('password');
+
+    btn.disabled = true;
+    btn.textContent = '確認中...';
+    status.className = '';
+
+    try {
+      const res = await fetch(`${workerUrl}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      if (res.status === 401) {
+        showError('パスワードが違います。');
+        return;
+      }
+
+      if (!res.ok) {
+        showError(`サーバーエラー (${res.status})`);
+        return;
+      }
+
+      const { token } = await res.json();
+      localStorage.setItem('jwt', token);
+      window.location.replace('/new');
+    } catch {
+      showError('通信エラーが発生しました。');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'ログイン';
+    }
+  });
+</script>
